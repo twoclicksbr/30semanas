@@ -9,7 +9,11 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Str;
+use App\Mail\VerifyEmail;
+use Carbon\Carbon;
 
 class PersonUserController extends Controller
 {   
@@ -23,6 +27,9 @@ class PersonUserController extends Controller
         $id_person = $request->input('id_person');
         $email = $request->input('email');
         $active = $request->input('active');
+        $email_verified = $request->input('email_verified');
+        $last_login_start = $request->input('last_login_start');
+        $last_login_end = $request->input('last_login_end');
 
         // Ordenação e Paginação
         $sortBy = $request->input('sort_by', 'id'); 
@@ -48,6 +55,18 @@ class PersonUserController extends Controller
 
         if (!is_null($active) && in_array($active, [0, 1])) {
             $query->where('active', $active);
+        }
+
+        if (!is_null($email_verified)) {
+            if ($email_verified) {
+                $query->whereNotNull('email_verified_at');
+            } else {
+                $query->whereNull('email_verified_at');
+            }
+        }
+
+        if (!empty($last_login_start) && !empty($last_login_end)) {
+            $query->whereBetween('last_login_at', [$last_login_start, $last_login_end]);
         }
 
         // Verifica se há um parâmetro 'created_at' na requisição e aplica o filtro
@@ -76,6 +95,9 @@ class PersonUserController extends Controller
                 'id_person' => $id_person,
                 'email' => $email,
                 'active' => $active,
+                'email_verified' => $email_verified,
+                'last_login_start' => $last_login_start,
+                'last_login_end' => $last_login_end,
                 'sort_by' => $sortBy,
                 'sort_order' => $sortOrder,
                 'created_at_start' => $created_at_start,
@@ -114,12 +136,11 @@ class PersonUserController extends Controller
         DB::beginTransaction();
 
         try {
+            
             // Obtém o id_credential da sessão
             $credentialId = Session::get('id_credential');
-
-            if (is_null($credentialId)) {
-                throw new Exception('Credential ID not found in session');
-            }
+            
+            $verificationToken = Str::random(60);
             
             $result = PersonUserModel::create([
                 'id_credential' => $credentialId,
@@ -127,8 +148,9 @@ class PersonUserController extends Controller
                 'email' => $request->email,
                 'password' => $request->password,
                 'active' => $request->active,
+                'verification_token' => $verificationToken,
             ]);
-            
+
             DB::commit();
 
             return response()->json([
@@ -139,14 +161,12 @@ class PersonUserController extends Controller
 
         } catch (Exception $e) {
             DB::rollback();
-
             return response()->json([
                 'status' => false,
                 'message' => "Record not registered.",
-                'error' => $e->getMessage(), // Inclui a mensagem de erro
+                'error' => $e->getMessage(),
             ], 400);
         }
-
     }
 
     public function update(PersonUserRequest $request, $id) : JsonResponse
@@ -154,13 +174,9 @@ class PersonUserController extends Controller
         DB::beginTransaction();
 
         try {
-            // Obtém o id_credential da sessão
             $credentialId = Session::get('id_credential');
-
-            // Encontre a credencial pelo ID e id_credential
             $result = PersonUserModel::where('id', $id)->where('id_credential', $credentialId)->firstOrFail();
-
-            // Atualize os campos da credencial
+            
             $result->update([
                 'id_person' => $request->id_person,
                 'email' => $request->email,
@@ -175,22 +191,77 @@ class PersonUserController extends Controller
                 'result' => $result,
                 'message' => "Record successfully updated.",
             ], 200);
-
         } catch (ModelNotFoundException $e) {
             DB::rollback();
-
             return response()->json([
                 'status' => false,
                 'message' => "Record not found.",
             ], 404);
-
         } catch (Exception $e) {
             DB::rollback();
-
             return response()->json([
                 'status' => false,
                 'message' => "Record not updated.",
+                'error' => $e->getMessage(),
             ], 400);
+        }
+    }
+
+    public function check_email($id) : JsonResponse
+    {
+        try {
+            $credentialId = Session::get('id_credential');
+            
+            $user = PersonUserModel::with('person')->where('id', $id)->where('id_credential', $credentialId)->firstOrFail();
+
+            if (!$user->person) {
+                throw new Exception('Person relationship not found.');
+            }
+            
+            // Envia o e-mail
+            Mail::to($user->email)->send(new VerifyEmail($user));
+            
+            return response()->json([
+                'status' => true,
+                'message' => 'Verification email sent successfully.',
+            ], 200);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Record not found.',
+            ], 404);
+        } catch (Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error sending email.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function validate_email($token)
+    {
+        try {
+            $user = PersonUserModel::where('verification_token', $token)->firstOrFail();
+            
+            $user->email_verified_at = Carbon::now();
+            $user->verification_token = null;
+            $user->save();
+            
+            return view('validate_email_result', [
+                'status' => true,
+                'message' => 'E-mail validado com sucesso!'
+            ]);
+        } catch (ModelNotFoundException $e) {
+            return view('validate_email_result', [
+                'status' => false,
+                'message' => 'Token inválido ou expirado.'
+            ]);
+        } catch (Exception $e) {
+            return view('validate_email_result', [
+                'status' => false,
+                'message' => 'Erro ao validar e-mail. Tente novamente mais tarde.'
+            ]);
         }
     }
 
