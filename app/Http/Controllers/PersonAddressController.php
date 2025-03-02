@@ -258,7 +258,7 @@ class PersonAddressController extends Controller
         }
     }
 
-    public function distroy($id) : JsonResponse
+    public function destroy($id) : JsonResponse
     {
         DB::beginTransaction();
 

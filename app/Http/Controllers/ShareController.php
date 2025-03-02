@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\TypePersonRequest;
-use App\Models\TypePersonModel;
+use App\Http\Requests\ShareRequest;
+use App\Models\ShareModel;
 use Exception;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
@@ -11,7 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 
-class TypePersonController extends Controller
+class ShareController extends Controller
 {   
     public function index(Request $request) : JsonResponse
     {
@@ -21,6 +21,9 @@ class TypePersonController extends Controller
         // Obtém os parâmetros da requisição
         $id = $request->input('id');
         $name = $request->input('name');
+        $id_gender = $request->input('id_gender');
+        $id_person = $request->input('id_person');
+        $link = $request->input('link');
         $active = $request->input('active');
 
         // Ordenação e Paginação
@@ -29,7 +32,7 @@ class TypePersonController extends Controller
         $perPage = $request->input('per_page', 25); 
 
         // Constrói a consulta base
-        $query = TypePersonModel::where('id_credential', $credentialId);
+        $query = ShareModel::where('id_credential', $credentialId);
 
         // Filtros opcionais
         if (!empty($id)) {
@@ -39,6 +42,16 @@ class TypePersonController extends Controller
 
         if (!empty($name)) {
             $query->where('name', 'LIKE', '%' . $name . '%');
+        }
+
+        if (!empty($id_gender)) {
+            $id_genderArray = explode(',', $id_gender); 
+            $query->whereIn('id_gender', $id_genderArray);
+        }
+
+        if (!empty($id_person)) {
+            $id_personArray = explode(',', $id_person); 
+            $query->whereIn('id_person', $id_personArray);
         }
 
         if (!is_null($active) && in_array($active, [0, 1])) {
@@ -69,6 +82,9 @@ class TypePersonController extends Controller
             'search' => [
                 'id' => $id,
                 'name' => $name,
+                'id_gender' => $id_gender,
+                'id_person' => $id_person,
+                'link' => $link,
                 'active' => $active,
                 'sort_by' => $sortBy,
                 'sort_order' => $sortOrder,
@@ -87,7 +103,7 @@ class TypePersonController extends Controller
             $credentialId = Session::get('id_credential');
 
             // Tente encontrar a credencial pelo ID e id_credential
-            $result = TypePersonModel::where('id', $id)->where('id_credential', $credentialId)->firstOrFail();
+            $result = ShareModel::where('id', $id)->where('id_credential', $credentialId)->firstOrFail();
             
             return response()->json([ 
                 'status' => true, 
@@ -103,7 +119,7 @@ class TypePersonController extends Controller
         }
     }
 
-    public function store(TypePersonRequest $request) : JsonResponse
+    public function store(ShareRequest $request) : JsonResponse
     {
         DB::beginTransaction();
 
@@ -115,9 +131,12 @@ class TypePersonController extends Controller
                 throw new Exception('Credential ID not found in session');
             }
             
-            $result = TypePersonModel::create([
+            $result = ShareModel::create([
                 'id_credential' => $credentialId,
                 'name' => $request->name,
+                'id_gender' => $request->id_gender,
+                'id_person' => $request->id_person,
+                'link' => $request->link,
                 'active' => $request->active,
             ]);
             
@@ -135,12 +154,13 @@ class TypePersonController extends Controller
             return response()->json([
                 'status' => false,
                 'message' => "Record not registered.",
+                'error' => $e->getMessage(), // Inclui a mensagem de erro
             ], 400);
         }
 
     }
 
-    public function update(TypePersonRequest $request, $id) : JsonResponse
+    public function update(ShareRequest $request, $id) : JsonResponse
     {
         DB::beginTransaction();
 
@@ -149,11 +169,14 @@ class TypePersonController extends Controller
             $credentialId = Session::get('id_credential');
 
             // Encontre a credencial pelo ID e id_credential
-            $result = TypePersonModel::where('id', $id)->where('id_credential', $credentialId)->firstOrFail();
+            $result = ShareModel::where('id', $id)->where('id_credential', $credentialId)->firstOrFail();
 
             // Atualize os campos da credencial
             $result->update([
                 'name' => $request->name,
+                'id_gender' => $request->id_gender,
+                'id_person' => $request->id_person,
+                'link' => $request->link,
                 'active' => $request->active,
             ]);
 
@@ -192,7 +215,7 @@ class TypePersonController extends Controller
             $credentialId = Session::get('id_credential');
 
             // Encontre a credencial pelo ID e id_credential
-            $result = TypePersonModel::where('id', $id)->where('id_credential', $credentialId)->firstOrFail();
+            $result = ShareModel::where('id', $id)->where('id_credential', $credentialId)->firstOrFail();
 
             // Deleta a credencial
             $result->delete();

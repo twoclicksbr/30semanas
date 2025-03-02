@@ -4,11 +4,12 @@ use App\Http\Controllers\CredentialController;
 use App\Http\Controllers\GenderController;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\LogoutController;
+use App\Http\Controllers\ShareController;
 use App\Http\Controllers\PersonAddressController;
 use App\Http\Controllers\PersonController;
 use App\Http\Controllers\PersonUserController;
 use App\Http\Controllers\TypePersonController;
-
+use App\Http\Controllers\VideoController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Middleware\VerifyHeaders;
 
@@ -49,13 +50,26 @@ Route::middleware([VerifyHeaders::class])->group(function () {
 
     Route::get('/check_email/{id}', [PersonUserController::class, 'check_email']);
 
-
     // Rotas para Gender
     Route::get('/gender', [GenderController::class, 'index']); // Lista todos os gêneros
     Route::get('/gender/{gender}', [GenderController::class, 'show']); // Mostra um gênero específico
     Route::post('/gender', [GenderController::class, 'store']); // Cria um novo gênero
     Route::put('/gender/{gender}', [GenderController::class, 'update']); // Atualiza um gênero existente
     Route::delete('/gender/{gender}', [GenderController::class, 'distroy']); // Deleta um gênero
+
+    // Rotas para Video
+    Route::get('/video', [VideoController::class, 'index']); // Lista todos os videos
+    Route::get('/video/{video}', [VideoController::class, 'show']); // Mostra um video específico
+    Route::post('/video', [VideoController::class, 'store']); // Cria um novo video
+    Route::put('/video/{video}', [VideoController::class, 'update']); // Atualiza um video existente
+    Route::delete('/video/{video}', [VideoController::class, 'distroy']); // Deleta um video
+
+    // Rotas para Partilha
+    Route::get('/share', [ShareController::class, 'index']); // Lista todos os Partilhas
+    Route::get('/share/{share}', [ShareController::class, 'show']); // Mostra uma Partilha específico
+    Route::post('/share', [ShareController::class, 'store']); // Cria um novo Partilha
+    Route::put('/share/{share}', [ShareController::class, 'update']); // Atualiza uma Partilha existente
+    Route::delete('/share/{share}', [ShareController::class, 'distroy']); // Deleta uma Partilha
 
     // Rotas para TypePerson
     Route::get('/type_person', [TypePersonController::class, 'index']); // Lista todos os tipos de pessoa
